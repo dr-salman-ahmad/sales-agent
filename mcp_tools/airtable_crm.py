@@ -121,7 +121,41 @@ async def list_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Record ID to update",
                     },
-                    "fields": {"type": "object", "description": "Fields to update"},
+                    "fields": {
+                        "type": "object",
+                        "description": "Fields to update",
+                        "properties": {
+                            "Industry": {
+                                "type": "string",
+                                "description": "Company's industry from Hunter.io",
+                            },
+                            "Employees": {
+                                "type": "string",
+                                "description": "Company's employee count from Hunter.io",
+                            },
+                            "LinkedIn": {
+                                "type": "string",
+                                "description": "Company's LinkedIn profile URL",
+                            },
+                            "Product Launch": {
+                                "type": "string",
+                                "description": "Product launch information from company description",
+                            },
+                            "Email": {
+                                "type": "string",
+                                "description": "Lead's email address from Hunter.io",
+                            },
+                            "Address": {
+                                "type": "string",
+                                "description": "Lead's address",
+                            },
+                            "Enriched": {
+                                "type": "boolean",
+                                "description": "Whether the lead has been enriched with Hunter.io data",
+                                "default": True,
+                            },
+                        },
+                    },
                 },
                 "required": ["access_token", "base_id", "record_id", "fields"],
             },

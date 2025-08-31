@@ -37,7 +37,7 @@ async def list_tools() -> list[Tool]:
                     "limit": {
                         "type": "integer",
                         "description": "Maximum number of emails to return",
-                        "default": 10,
+                        "default": 1,
                     },
                 },
                 "required": ["domain"],
@@ -102,36 +102,58 @@ async def find_emails(arguments: Dict[str, Any]) -> Sequence[TextContent]:
             if response.status_code == 200:
                 data = response.json()
 
-                if data.get("data") and data["data"].get("emails"):
-                    emails = data["data"]["emails"]
+                if data.get("data"):
+                    domain_data = data["data"]
+                    emails = domain_data.get("emails", [])
 
-                    # Format email results
-                    results = []
-                    for email_data in emails:
-                        email_info = {
-                            "email": email_data.get("value", ""),
-                            "first_name": email_data.get("first_name", ""),
-                            "last_name": email_data.get("last_name", ""),
-                            "position": email_data.get("position", ""),
-                            "verification_status": email_data.get(
-                                "verification", {}
-                            ).get("result", ""),
-                            "confidence": email_data.get("confidence", 0),
-                        }
-                        results.append(email_info)
+                    # Get first email with highest confidence
+                    first_valid_email = None
+                    highest_confidence = -1
 
-                    # Return formatted results
-                    result_text = f"Found {len(results)} emails for {domain}:\n\n"
-                    for i, email_info in enumerate(results, 1):
-                        result_text += f"{i}. {email_info['email']}\n"
-                        if email_info["first_name"] or email_info["last_name"]:
-                            result_text += f"   Name: {email_info['first_name']} {email_info['last_name']}\n"
-                        if email_info["position"]:
-                            result_text += f"   Position: {email_info['position']}\n"
-                        result_text += (
-                            f"   Verification: {email_info['verification_status']}\n"
-                        )
-                        result_text += f"   Confidence: {email_info['confidence']}%\n\n"
+                    for email in emails:
+                        if email.get("value"):
+                            confidence = email.get("confidence", 0)
+                            verification = email.get("verification", {}).get(
+                                "result", ""
+                            )
+                            # Prioritize valid emails, then high confidence ones
+                            if (
+                                verification == "valid"
+                                or confidence > highest_confidence
+                            ):
+                                highest_confidence = confidence
+                                first_valid_email = email
+
+                    # Construct full address
+                    address_parts = [
+                        domain_data.get("street", ""),
+                        domain_data.get("city", ""),
+                        domain_data.get("state", ""),
+                        domain_data.get("country", ""),
+                    ]
+                    full_address = ", ".join(
+                        part for part in address_parts if part and part.strip()
+                    )
+
+                    # Prepare enriched data
+                    enriched_data = {
+                        "Industry": domain_data.get("industry"),
+                        "Employees": domain_data.get("headcount"),
+                        "LinkedIn": domain_data.get("linkedin"),
+                        "Product Launch": domain_data.get("description"),
+                        "Email": (
+                            first_valid_email.get("value")
+                            if first_valid_email
+                            else None
+                        ),
+                        "Address": full_address if full_address else None,
+                        "Enriched": True,
+                    }
+
+                    # Return only the enriched data for a single lead
+                    import json
+
+                    result_text = json.dumps({"fields": enriched_data}, indent=2)
 
                     return [TextContent(type="text", text=result_text)]
                 else:
