@@ -87,7 +87,6 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
             new_message=content,
         ):
             events.append(event)
-            print(event)  # For debugging
 
         # Extract response from events
         response_message = "Response from agent"

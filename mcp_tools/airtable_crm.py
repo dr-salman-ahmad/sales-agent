@@ -96,8 +96,11 @@ async def list_tools() -> list[Tool]:
                                             "type": "string",
                                             "description": "Description of the lead",
                                         },
+                                        "Score": {
+                                            "type": "string",
+                                            "description": "Lead's score Hot, Cold or Warm",
+                                        },
                                     },
-                                    "required": ["Name", "Company"],
                                 }
                             },
                         },
@@ -564,18 +567,16 @@ async def get_personas(arguments: Dict[str, Any]) -> Sequence[TextContent]:
                     persona = records[0].get("fields", {})
 
                     result_text = f"User's ICP Persona:\n\n"
-                    result_text += f"Name: {persona.get('Name', 'Default Persona')}\n"
-                    result_text += f"Target Industries: {persona.get('Target Industries', 'Not specified')}\n"
-                    result_text += f"Company Size: {persona.get('Company Size Range', 'Not specified')}\n"
                     result_text += (
-                        f"Job Titles: {persona.get('Job Titles', 'Not specified')}\n"
+                        f"Persona Name: {persona.get('Persona Name', 'N/A')}\n"
                     )
+                    result_text += f"Keywords: {persona.get('Keywords', 'N/A')}\n"
+                    result_text += f"Description: {persona.get('Description (size, pain points, goals)', 'N/A')}\n"
                     result_text += (
-                        f"Pain Points: {persona.get('Pain Points', 'Not specified')}\n"
+                        f"Revenue/Funding: {persona.get('Revenue/Funding$', 'N/A')}\n"
                     )
-                    result_text += (
-                        f"Use Cases: {persona.get('Use Cases', 'Not specified')}\n"
-                    )
+                    result_text += f"Region: {persona.get('Region', 'N/A')}\n"
+                    result_text += f"Job Titles: {persona.get('Job Titles', 'N/A')}\n"
 
                     return [TextContent(type="text", text=result_text)]
                 else:
