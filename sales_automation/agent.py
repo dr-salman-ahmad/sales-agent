@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 from google.adk.agents import Agent
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters
+from google.adk.tools.mcp_tool import StdioConnectionParams
 from google.adk.sessions import InMemorySessionService
 from google.adk.runners import Runner
 from .prompts import get_root_agent_instructions
@@ -32,10 +33,13 @@ def create_root_agent() -> Agent:
 
     # Azure Logic App MCP Tool
     azure_tool = MCPToolset(
-        connection_params=StdioServerParameters(
-            command="python",
-            args=["-m", "mcp_tools.azure_logic_app"],
-            env={"AZURE_LOGIC_APP_URL": os.getenv("AZURE_LOGIC_APP_URL", "")},
+        connection_params=StdioConnectionParams(
+            server_params=StdioServerParameters(
+                command="python",
+                args=["-m", "mcp_tools.azure_logic_app"],
+                env={"AZURE_LOGIC_APP_URL": os.getenv("AZURE_LOGIC_APP_URL", "")},
+            ),
+            timeout=60,
         ),
     )
     mcp_tools.append(azure_tool)
@@ -52,9 +56,12 @@ def create_root_agent() -> Agent:
 
     # Airtable CRM MCP Tool
     airtable_tool = MCPToolset(
-        connection_params=StdioServerParameters(
-            command="python",
-            args=["-m", "mcp_tools.airtable_crm"],
+        connection_params=StdioConnectionParams(
+            server_params=StdioServerParameters(
+                command="python",
+                args=["-m", "mcp_tools.airtable_crm"],
+            ),
+            timeout=60,
         ),
     )
     mcp_tools.append(airtable_tool)
@@ -89,15 +96,19 @@ def create_root_agent() -> Agent:
 
     # Supabase MCP Tool
     supabase_tool = MCPToolset(
-        connection_params=StdioServerParameters(
-            command="python",
-            args=["-m", "mcp_tools.supabase_client"],
-            env={
-                "SUPABASE_URL": os.getenv("SUPABASE_URL", ""),
-                "SUPABASE_KEY": os.getenv("SUPABASE_KEY", ""),
-            },
+        connection_params=StdioConnectionParams(
+            server_params=StdioServerParameters(
+                command="python",
+                args=["-m", "mcp_tools.supabase_client"],
+                env={
+                    "SUPABASE_URL": os.getenv("SUPABASE_URL", ""),
+                    "SUPABASE_KEY": os.getenv("SUPABASE_KEY", ""),
+                },
+            ),
+            timeout=60,
         ),
     )
+
     mcp_tools.append(supabase_tool)
 
     # Create the root agent

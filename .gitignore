@@ -4,3 +4,4 @@ __pycache__/
 deployment/
 tests/
 google-cred.json
+logs/

@@ -10,6 +10,10 @@ import httpx
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
+from utils.helpers import setup_api_logger, log_api_interaction
+
+# Setup API logger
+setup_api_logger()
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +31,12 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "access_token": {
+                    "user_id": {
                         "type": "string",
-                        "description": "User's Airtable access token",
+                        "description": "User ID to get base ID for",
                     }
                 },
-                "required": ["access_token"],
+                "required": ["user_id"],
             },
         ),
         Tool(
@@ -55,6 +59,45 @@ async def list_tools() -> list[Tool]:
                                 "fields": {
                                     "type": "object",
                                     "description": "Lead fields",
+                                    "properties": {
+                                        "UUID": {
+                                            "type": "string",
+                                            "description": "Unique identifier for the lead",
+                                        },
+                                        "Name": {
+                                            "type": "string",
+                                            "description": "Lead's name",
+                                        },
+                                        "Address": {
+                                            "type": "string",
+                                            "description": "Lead's address",
+                                        },
+                                        "Website": {
+                                            "type": "string",
+                                            "description": "Lead's website URL",
+                                        },
+                                        "Email": {
+                                            "type": "string",
+                                            "description": "Lead's email address",
+                                        },
+                                        "Phone": {
+                                            "type": "string",
+                                            "description": "Lead's phone number",
+                                        },
+                                        "Title": {
+                                            "type": "string",
+                                            "description": "Lead's job title",
+                                        },
+                                        "Company": {
+                                            "type": "string",
+                                            "description": "Lead's company name",
+                                        },
+                                        "Background": {
+                                            "type": "string",
+                                            "description": "Description of the lead",
+                                        },
+                                    },
+                                    "required": ["Name", "Company"],
                                 }
                             },
                         },
@@ -149,17 +192,65 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> Sequence[TextConten
 async def get_base_id(arguments: Dict[str, Any]) -> Sequence[TextContent]:
     """Get the base ID for user's Sales Agent CRM"""
     try:
-        access_token = arguments.get("access_token")
-        if not access_token:
-            return [TextContent(type="text", text="Error: Access token is required")]
+        from supabase import create_client
+        import json
+        from dotenv import load_dotenv
 
+        load_dotenv()
+
+        # Get Supabase credentials
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_KEY")
+
+        if not supabase_url or not supabase_key:
+            return [
+                TextContent(
+                    type="text", text="Error: Supabase credentials not configured"
+                )
+            ]
+
+        # Get user_id from access token or arguments
+        user_id = arguments.get("user_id")
+        if not user_id:
+            return [TextContent(type="text", text="Error: User ID is required")]
+
+        # Get Airtable token from Supabase
+        client = create_client(supabase_url, supabase_key)
+        response = (
+            client.table("oauth_connections")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("provider", "airtable")
+            .eq("is_active", True)
+            .execute()
+        )
+
+        if not response.data:
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No active Airtable connection found for user {user_id}",
+                )
+            ]
+
+        access_token = response.data[0]["access_token"]
         logger.info("Getting user's Airtable bases")
 
+        headers = {"Authorization": f"Bearer {access_token}"}
+        url = "https://api.airtable.com/v0/meta/bases"
+
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                "https://api.airtable.com/v0/meta/bases",
-                headers={"Authorization": f"Bearer {access_token}"},
-            )
+            try:
+                response = await client.get(url, headers=headers)
+
+                # Log the API interaction
+                log_api_interaction(
+                    method="GET", url=url, headers=headers, response=response
+                )
+            except Exception as e:
+                # Log the failed API interaction
+                log_api_interaction(method="GET", url=url, headers=headers, error=e)
+                raise
 
             if response.status_code == 200:
                 data = response.json()
@@ -197,6 +288,8 @@ async def get_base_id(arguments: Dict[str, Any]) -> Sequence[TextContent]:
 async def create_leads(arguments: Dict[str, Any]) -> Sequence[TextContent]:
     """Create new leads in user's Airtable CRM"""
     try:
+        from utils.helpers import generate_uuid
+
         access_token = arguments.get("access_token")
         base_id = arguments.get("base_id")
         leads = arguments.get("leads", [])
@@ -213,14 +306,30 @@ async def create_leads(arguments: Dict[str, Any]) -> Sequence[TextContent]:
 
         logger.info(f"Creating {len(leads)} leads in Airtable")
 
+        # Process leads to ensure each has a UUID
+        processed_leads = []
+        for lead in leads:
+            fields = lead.get("fields", {})
+            # Generate UUID if not provided
+            fields["UUID"] = generate_uuid()
+            processed_leads.append({"fields": fields})
+
+        url = f"https://api.airtable.com/v0/{base_id}/Demo%20Table"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
+        body = {"records": processed_leads}
+
+        # Log the request
+        log_api_interaction(method="POST", url=url, headers=headers, body=body)
+
         async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"https://api.airtable.com/v0/{base_id}/Demo%20Table",
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Content-Type": "application/json",
-                },
-                json={"records": leads},
+            response = await client.post(url, headers=headers, json=body)
+
+            # Log the response
+            log_api_interaction(
+                method="POST", url=url, headers=headers, response=response
             )
 
             if response.status_code == 200:
@@ -264,14 +373,22 @@ async def update_lead(arguments: Dict[str, Any]) -> Sequence[TextContent]:
 
         logger.info(f"Updating lead {record_id} in Airtable")
 
+        url = f"https://api.airtable.com/v0/{base_id}/Demo%20Table/{record_id}"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
+        body = {"fields": fields}
+
+        # Log the request
+        log_api_interaction(method="PATCH", url=url, headers=headers, body=body)
+
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.patch(
-                f"https://api.airtable.com/v0/{base_id}/Demo%20Table/{record_id}",
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Content-Type": "application/json",
-                },
-                json={"fields": fields},
+            response = await client.patch(url, headers=headers, json=body)
+
+            # Log the response
+            log_api_interaction(
+                method="PATCH", url=url, headers=headers, response=response
             )
 
             if response.status_code == 200:
@@ -314,11 +431,20 @@ async def search_leads(arguments: Dict[str, Any]) -> Sequence[TextContent]:
         if filter_formula:
             params["filterByFormula"] = filter_formula
 
+        url = f"https://api.airtable.com/v0/{base_id}/Demo%20Table"
+        headers = {"Authorization": f"Bearer {access_token}"}
+
+        # Log the request
+        log_api_interaction(
+            method="GET", url=url, headers=headers, body={"params": params}
+        )
+
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"https://api.airtable.com/v0/{base_id}/Demo%20Table",
-                headers={"Authorization": f"Bearer {access_token}"},
-                params=params,
+            response = await client.get(url, headers=headers, params=params)
+
+            # Log the response
+            log_api_interaction(
+                method="GET", url=url, headers=headers, response=response
             )
 
             if response.status_code == 200:
@@ -376,14 +502,24 @@ async def get_personas(arguments: Dict[str, Any]) -> Sequence[TextContent]:
 
         logger.info(f"Getting personas for user {user_id}")
 
+        url = f"https://api.airtable.com/v0/{base_id}/Personas"
+        headers = {"Authorization": f"Bearer {access_token}"}
+        params = {
+            "filterByFormula": f'{{User ID}} = "{user_id}"',
+            "maxRecords": 1,
+        }
+
+        # Log the request
+        log_api_interaction(
+            method="GET", url=url, headers=headers, body={"params": params}
+        )
+
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"https://api.airtable.com/v0/{base_id}/Personas",
-                headers={"Authorization": f"Bearer {access_token}"},
-                params={
-                    "filterByFormula": f'{{User ID}} = "{user_id}"',
-                    "maxRecords": 1,
-                },
+            response = await client.get(url, headers=headers, params=params)
+
+            # Log the response
+            log_api_interaction(
+                method="GET", url=url, headers=headers, response=response
             )
 
             if response.status_code == 200:

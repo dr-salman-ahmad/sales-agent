@@ -6,9 +6,86 @@ import uuid
 import re
 import base64
 import logging
+import json
+import os
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse, urljoin
 from datetime import datetime
+
+
+def setup_api_logger():
+    """Setup logger for API interactions"""
+    # Create logs directory if it doesn't exist
+    if not os.path.exists("logs"):
+        os.makedirs("logs")
+
+    # Create a logger for API interactions
+    api_logger = logging.getLogger("api_interactions")
+    api_logger.setLevel(logging.DEBUG)
+
+    # Create file handler
+    file_handler = logging.FileHandler("logs/api_interactions.log")
+    file_handler.setLevel(logging.DEBUG)
+
+    # Create formatter
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    file_handler.setFormatter(formatter)
+
+    # Add handler to logger if it doesn't already have it
+    if not api_logger.handlers:
+        api_logger.addHandler(file_handler)
+
+    return api_logger
+
+
+def log_api_interaction(
+    method: str,
+    url: str,
+    headers: Dict,
+    body: Any = None,
+    response: Any = None,
+    error: Any = None,
+):
+    """Log API request and response details"""
+    api_logger = logging.getLogger("api_interactions")
+
+    # Log full headers including auth tokens
+    log_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "method": method,
+        "url": url,
+        "headers": headers,  # Log original headers
+    }
+
+    if body:
+        # Log full body including tokens
+        log_entry["request_body"] = body
+
+    if response:
+        try:
+            if hasattr(response, "status_code"):
+                log_entry["response_status"] = response.status_code
+            if hasattr(response, "headers"):
+                log_entry["response_headers"] = dict(response.headers)
+            if hasattr(response, "text"):
+                try:
+                    # Try to parse as JSON
+                    response_body = json.loads(response.text)
+                    # Log full response including tokens
+                    log_entry["response_body"] = response_body
+                except json.JSONDecodeError:
+                    # If not JSON, store as text
+                    log_entry["response_body"] = response.text
+        except Exception as e:
+            log_entry["response_logging_error"] = str(e)
+
+    if error:
+        log_entry["error"] = str(error)
+
+    api_logger.debug(json.dumps(log_entry, indent=2))
+
 
 logger = logging.getLogger(__name__)
 
@@ -268,27 +345,16 @@ def validate_lead_data(lead_data: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and clean lead data"""
     cleaned = {}
 
-    # Required fields
-    cleaned["name"] = clean_company_name(lead_data.get("name", ""))
-    cleaned["uuid"] = lead_data.get("uuid", generate_uuid())
-
-    # Optional fields with cleaning
-    cleaned["website"] = clean_url(lead_data.get("website", ""))
-    cleaned["email"] = clean_email(lead_data.get("email", ""))
-    cleaned["phone"] = clean_phone(lead_data.get("phone", ""))
-    cleaned["industry"] = lead_data.get("industry", "").strip()
-    cleaned["company_size"] = parse_company_size(lead_data.get("company_size", ""))
-    cleaned["address"] = lead_data.get("address", "").strip()
-    cleaned["linkedin"] = clean_url(lead_data.get("linkedin", ""))
-    cleaned["background"] = lead_data.get("background", "").strip()
-
-    # Timestamps
-    cleaned["created_at"] = datetime.utcnow()
-    cleaned["updated_at"] = datetime.utcnow()
-
-    # Flags
-    cleaned["enriched"] = lead_data.get("enriched", False)
-    cleaned["email_sent"] = lead_data.get("email_sent", False)
+    # Required fields with your Airtable structure
+    cleaned["UUID"] = generate_uuid()
+    cleaned["Name"] = lead_data.get("Name", "N/A")
+    cleaned["Address"] = lead_data.get("Address", "N/A")
+    cleaned["Website"] = clean_url(lead_data.get("Website", "N/A"))
+    cleaned["Email"] = clean_email(lead_data.get("Email", "Not available"))
+    cleaned["Phone"] = clean_phone(lead_data.get("Phone", "Not available"))
+    cleaned["Title"] = lead_data.get("Title", "N/A")
+    cleaned["Company"] = clean_company_name(lead_data.get("Company", "N/A"))
+    cleaned["Background"] = lead_data.get("Description", "N/A")
 
     return cleaned
 
