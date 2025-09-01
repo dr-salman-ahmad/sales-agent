@@ -89,20 +89,6 @@ async def get_oauth_connection(arguments: Dict[str, Any]) -> Sequence[TextConten
 
         client = create_client(supabase_url, supabase_key)
 
-        # Prepare request details
-        url = f"{supabase_url}/rest/v1/oauth_connections"
-        headers = {
-            "apikey": supabase_key,
-            "Authorization": f"Bearer {supabase_key}",
-            "Content-Type": "application/json",
-        }
-        params = {
-            "select": "*",
-            "user_id": f"eq.{user_id}",
-            "provider": f"eq.{provider}",
-            "is_active": "eq.true",
-        }
-
         # Execute request
         response = (
             client.table("oauth_connections")
@@ -292,15 +278,6 @@ async def update_oauth_tokens(
 
         if provider == "airtable" and refresh_token:
             update_data["refresh_token"] = refresh_token
-
-        # Prepare request details
-        url = f"{supabase_url}/rest/v1/oauth_connections"
-        headers = {
-            "apikey": supabase_key,
-            "Authorization": f"Bearer {supabase_key}",
-            "Content-Type": "application/json",
-            "Prefer": "return=representation",
-        }
 
         # Execute request
         response = (
