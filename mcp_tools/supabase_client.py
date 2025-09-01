@@ -6,18 +6,16 @@ import os
 import logging
 import asyncio
 from typing import Any, Sequence, Dict
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 from dotenv import load_dotenv
-from utils.helpers import setup_api_logger, log_api_interaction
 
 load_dotenv()
 
 # Setup loggers
 logger = logging.getLogger(__name__)
-setup_api_logger()
 
 # Create MCP server
 server = Server("supabase-client-server")
@@ -46,20 +44,6 @@ async def list_tools() -> list[Tool]:
                 "required": ["user_id", "provider"],
             },
         ),
-        Tool(
-            name="get_user_profile",
-            description="Get user profile information from Supabase",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "user_id": {
-                        "type": "string",
-                        "description": "User ID to get profile for",
-                    }
-                },
-                "required": ["user_id"],
-            },
-        ),
     ]
 
 
@@ -68,8 +52,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> Sequence[TextConten
     """Handle tool calls."""
     if name == "get_oauth_connection":
         return await get_oauth_connection(arguments)
-    elif name == "get_user_profile":
-        return await get_user_profile(arguments)
 
     raise ValueError(f"Unknown tool: {name}")
 
@@ -121,11 +103,6 @@ async def get_oauth_connection(arguments: Dict[str, Any]) -> Sequence[TextConten
             "is_active": "eq.true",
         }
 
-        # Log the request
-        log_api_interaction(
-            method="GET", url=url, headers=headers, body={"params": params}
-        )
-
         # Execute request
         response = (
             client.table("oauth_connections")
@@ -138,9 +115,6 @@ async def get_oauth_connection(arguments: Dict[str, Any]) -> Sequence[TextConten
         import asyncio
 
         await asyncio.sleep(3)
-
-        # Log the response
-        log_api_interaction(method="GET", url=url, headers=headers, response=response)
 
         if not response.data:
             return [
@@ -328,17 +302,6 @@ async def update_oauth_tokens(
             "Prefer": "return=representation",
         }
 
-        # Log the request
-        log_api_interaction(
-            method="PATCH",
-            url=url,
-            headers=headers,
-            body={
-                "data": update_data,
-                "filters": {"user_id": f"eq.{user_id}", "provider": f"eq.{provider}"},
-            },
-        )
-
         # Execute request
         response = (
             client.table("oauth_connections")
@@ -352,9 +315,6 @@ async def update_oauth_tokens(
 
         await asyncio.sleep(3)
 
-        # Log the response
-        log_api_interaction(method="PATCH", url=url, headers=headers, response=response)
-
         if response.data:
             return response.data[0]
         else:
@@ -365,64 +325,6 @@ async def update_oauth_tokens(
     except Exception as e:
         logger.error(f"Error updating OAuth tokens: {str(e)}")
         raise
-
-
-async def get_user_profile(arguments: Dict[str, Any]) -> Sequence[TextContent]:
-    """Get user profile information from Supabase"""
-    try:
-        from supabase import create_client
-
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_KEY")
-
-        if not supabase_url or not supabase_key:
-            return [
-                TextContent(
-                    type="text", text="Error: Supabase credentials not configured"
-                )
-            ]
-
-        user_id = arguments.get("user_id")
-        if not user_id:
-            return [TextContent(type="text", text="Error: User ID is required")]
-
-        client = create_client(supabase_url, supabase_key)
-
-        # Prepare request details
-        url = f"{supabase_url}/rest/v1/profiles"
-        headers = {
-            "apikey": supabase_key,
-            "Authorization": f"Bearer {supabase_key}",
-            "Content-Type": "application/json",
-        }
-        params = {"select": "*", "id": f"eq.{user_id}"}
-
-        # Log the request
-        log_api_interaction(
-            method="GET", url=url, headers=headers, body={"params": params}
-        )
-
-        # Execute request
-        response = client.table("profiles").select("*").eq("id", user_id).execute()
-
-        # Log the response
-        log_api_interaction(method="GET", url=url, headers=headers, response=response)
-
-        if not response.data:
-            return [
-                TextContent(type="text", text=f"No profile found for user {user_id}")
-            ]
-
-        import json
-
-        profile = response.data[0]
-
-        return [TextContent(type="text", text=json.dumps(profile, indent=2))]
-
-    except Exception as e:
-        error_msg = f"Error getting user profile: {str(e)}"
-        logger.error(error_msg)
-        return [TextContent(type="text", text=f"Error: {error_msg}")]
 
 
 async def main():
