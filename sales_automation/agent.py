@@ -46,10 +46,13 @@ def create_root_agent() -> Agent:
 
     # Hunter.io MCP Tool
     hunter_tool = MCPToolset(
-        connection_params=StdioServerParameters(
-            command="python",
-            args=["-m", "mcp_tools.hunter_io"],
-            env={"HUNTER_API_KEY": os.getenv("HUNTER_API_KEY", "")},
+        connection_params=StdioConnectionParams(
+            server_params=StdioServerParameters(
+                command="python",
+                args=["-m", "mcp_tools.hunter_io"],
+                env={"HUNTER_API_KEY": os.getenv("HUNTER_API_KEY", "")},
+            ),
+            timeout=60,
         ),
     )
     mcp_tools.append(hunter_tool)
@@ -68,28 +71,37 @@ def create_root_agent() -> Agent:
 
     # Gmail MCP Tool
     gmail_tool = MCPToolset(
-        connection_params=StdioServerParameters(
-            command="python",
-            args=["-m", "mcp_tools.gmail_sender"],
+        connection_params=StdioConnectionParams(
+            server_params=StdioServerParameters(
+                command="python",
+                args=["-m", "mcp_tools.gmail_sender"],
+            ),
+            timeout=60,
         ),
     )
     mcp_tools.append(gmail_tool)
 
     # Web Scraper MCP Tool
     web_scraper_tool = MCPToolset(
-        connection_params=StdioServerParameters(
-            command="python",
-            args=["-m", "mcp_tools.web_scraper"],
+        connection_params=StdioConnectionParams(
+            server_params=StdioServerParameters(
+                command="python",
+                args=["-m", "mcp_tools.web_scraper"],
+            ),
+            timeout=60,
         ),
     )
     mcp_tools.append(web_scraper_tool)
 
     # OpenAI MCP Tool
     openai_tool = MCPToolset(
-        connection_params=StdioServerParameters(
-            command="python",
-            args=["-m", "mcp_tools.openai_client"],
-            env={"OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", "")},
+        connection_params=StdioConnectionParams(
+            server_params=StdioServerParameters(
+                command="python",
+                args=["-m", "mcp_tools.openai_client"],
+                env={"OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", "")},
+            ),
+            timeout=60,
         ),
     )
     mcp_tools.append(openai_tool)
