@@ -16,6 +16,7 @@ from google.genai import types
 
 # Import our components
 from sales_automation.agent import sales_orchestrator
+from drive_automation.agent import drive_agent
 from utils.data_models import AgentResponse, TaskRequest
 from utils.supabase_client import supabase_client
 
@@ -53,6 +54,8 @@ class ChatRequest(BaseModel):
     message: str
     user_id: str
     user_email: str = None
+    agent_type: str = "sales_automation"  # "sales_automation" or "drive_automation"
+    folder_id: str = None  # For drive agent, specifies which folder to search in
 
 
 @app.post("/chat")
@@ -70,18 +73,33 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
         if not request.message.strip():
             raise HTTPException(status_code=400, detail="Message cannot be empty")
 
+        # Select the appropriate agent based on agent_type
+        agent = (
+            sales_orchestrator
+            if request.agent_type == "sales_automation"
+            else drive_agent
+        )
+
         # Get or create a session
-        session = await sales_orchestrator._get_or_create_session(request.user_id)
+        session = await agent._get_or_create_session(request.user_id)
 
         # Create content object for the runner
         content = types.Content(
             role="user",
-            parts=[types.Part(text=request.message + f"user_id: {request.user_id}")],
+            parts=[
+                types.Part(
+                    text=(
+                        request.message + f"user_id: {request.user_id}"
+                        if request.agent_type == "sales_automation"
+                        else f"user_id: {request.user_id} folder_id: {request.folder_id}"
+                    )
+                )
+            ],
         )
 
         # Run the agent with the session
         events = []
-        async for event in sales_orchestrator.runner.run_async(
+        async for event in agent.runner.run_async(
             user_id=request.user_id,
             session_id=session.id,  # Use the session ID we just got/created
             new_message=content,

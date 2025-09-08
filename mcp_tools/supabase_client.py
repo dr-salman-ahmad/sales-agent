@@ -37,8 +37,8 @@ async def list_tools() -> list[Tool]:
                     },
                     "provider": {
                         "type": "string",
-                        "description": "OAuth provider (gmail, airtable)",
-                        "enum": ["gmail", "airtable"],
+                        "description": "OAuth provider (gmail, airtable, google-drive)",
+                        "enum": ["gmail", "airtable", "google-drive"],
                     },
                 },
                 "required": ["user_id", "provider"],
@@ -121,8 +121,12 @@ async def get_oauth_connection(arguments: Dict[str, Any]) -> Sequence[TextConten
             logger.info(f"Token expired for {provider}. Attempting to refresh...")
 
             try:
-                if provider == "gmail" and gmail_client_id and gmail_client_secret:
-                    # Refresh Gmail token
+                if (
+                    (provider == "gmail" or provider == "google-drive")
+                    and gmail_client_id
+                    and gmail_client_secret
+                ):
+                    # Refresh Google/Gmail token
                     async with httpx.AsyncClient() as http_client:
                         refresh_response = await http_client.post(
                             "https://oauth2.googleapis.com/token",
