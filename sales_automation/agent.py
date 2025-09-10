@@ -9,8 +9,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 from google.adk.agents import Agent
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters
-from google.adk.tools.mcp_tool import StdioConnectionParams
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
+from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
+from mcp import StdioServerParameters
 from google.adk.sessions import InMemorySessionService
 from google.adk.runners import Runner
 from .prompts import get_root_agent_instructions

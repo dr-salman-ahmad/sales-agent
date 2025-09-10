@@ -4,7 +4,7 @@ Sales Automation Agent - FastAPI Main Application
 
 import os
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import uvicorn
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +18,8 @@ from google.genai import types
 from sales_automation.agent import sales_orchestrator
 from utils.data_models import AgentResponse, TaskRequest
 from utils.supabase_client import supabase_client
+from utils.drive_manager import list_files, read_file_content
+from utils.embeddings_manager import process_and_store_document
 
 # Load environment variables
 load_dotenv()
@@ -53,6 +55,19 @@ class ChatRequest(BaseModel):
     message: str
     user_id: str
     user_email: str = None
+
+
+class IndexFolderRequest(BaseModel):
+    user_id: str
+    folder_id: str
+    reset_collection: bool = False  # New parameter to control collection reset
+
+
+class IndexingResponse(BaseModel):
+    success: bool
+    message: str
+    files_processed: int
+    errors: Optional[List[str]] = None
 
 
 @app.post("/chat")
@@ -129,6 +144,108 @@ async def internal_error_handler(request, exc):
     return JSONResponse(
         status_code=500, content={"error": "Internal server error", "status_code": 500}
     )
+
+
+@app.post("/index-folder", response_model=IndexingResponse)
+async def index_folder(request: IndexFolderRequest):
+    """Index all files in a Google Drive folder and create embeddings"""
+    try:
+        logger.info(f"Indexing folder {request.folder_id} for user {request.user_id}")
+
+        # Get user's Google Drive OAuth credentials
+        oauth_data = await supabase_client.get_user_oauth_connections(request.user_id)
+        if not oauth_data or "google-drive" not in oauth_data:
+            raise HTTPException(
+                status_code=400,
+                detail="Google Drive credentials not found. Please connect your Google Drive account.",
+            )
+
+        # Get the Google Drive credentials
+        drive_creds = oauth_data["google-drive"]
+
+        # Check if token is expired
+        if drive_creds["is_expired"]:
+            # Try to refresh the token
+            try:
+                updated_creds = await supabase_client.refresh_oauth_token(
+                    request.user_id, "google-drive"
+                )
+                if not updated_creds:
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Failed to refresh Google Drive token. Please reconnect your account.",
+                    )
+                drive_creds = updated_creds
+            except Exception as e:
+                logger.error(f"Error refreshing token: {str(e)}")
+                raise HTTPException(
+                    status_code=401,
+                    detail="Failed to refresh Google Drive token. Please reconnect your account.",
+                )
+
+        # List all files in the folder
+        files = await list_files(drive_creds, request.folder_id)
+        if not files:
+            return IndexingResponse(
+                success=True, message="No files found in the folder", files_processed=0
+            )
+
+        errors = []
+        processed_count = 0
+
+        # Process each file
+        for file in files:
+            try:
+                # Skip unsupported file types
+                if "folder" in file["mimeType"]:
+                    continue
+
+                # Read file content
+                file_data = await read_file_content(drive_creds, file["id"])
+
+                # Process and store embeddings
+                await process_and_store_document(
+                    user_id=request.user_id,
+                    file_id=file["id"],
+                    content=file_data["content"],
+                    metadata={
+                        "name": file["name"],
+                        "mime_type": file["mimeType"],
+                        "modified_time": file["modifiedTime"],
+                        "size": file.get("size", 0),
+                    },
+                    reset_collection=request.reset_collection,  # Pass the reset flag
+                )
+
+                processed_count += 1
+                logger.info(f"Successfully processed file: {file['name']}")
+
+            except Exception as e:
+                error_msg = (
+                    f"Error processing file {file.get('name', 'unknown')}: {str(e)}"
+                )
+                logger.error(error_msg)
+                errors.append(error_msg)
+
+        # Prepare response
+        message = f"Successfully processed {processed_count} files"
+        if request.reset_collection:
+            message = f"Reset collection and {message.lower()}"
+        if errors:
+            message += f" with {len(errors)} errors"
+
+        return IndexingResponse(
+            success=True,
+            message=message,
+            files_processed=processed_count,
+            errors=errors if errors else None,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error indexing folder: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error indexing folder: {str(e)}")
 
 
 if __name__ == "__main__":
