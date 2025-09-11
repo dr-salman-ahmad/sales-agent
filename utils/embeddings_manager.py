@@ -15,8 +15,14 @@ logger = logging.getLogger(__name__)
 # Initialize OpenAI client
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Initialize ChromaDB with new client format
-chroma_client = chromadb.PersistentClient(path="embeddings_db")
+# Initialize ChromaDB with new client format and embedding function
+chroma_client = chromadb.PersistentClient(
+    path="embeddings_db",
+    settings=Settings(
+        anonymized_telemetry=False,
+        allow_reset=True,
+    ),
+)
 
 
 def get_or_create_collection(

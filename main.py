@@ -4,7 +4,7 @@ Sales Automation Agent - FastAPI Main Application
 
 import os
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Literal
 import uvicorn
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +16,7 @@ from google.genai import types
 
 # Import our components
 from sales_automation.agent import sales_orchestrator
+from data_analysis.agent import runner as analysis_runner, get_or_create_session
 from utils.data_models import AgentResponse, TaskRequest
 from utils.supabase_client import supabase_client
 from utils.drive_manager import list_files, read_file_content
@@ -41,7 +42,6 @@ ALLOWED_ORIGINS = ["*"]
 SERVE_WEB_INTERFACE = True
 
 # Call the function to get the FastAPI app instance
-# Ensure the agent directory name ('capital_agent') matches your agent folder
 app: FastAPI = get_fast_api_app(
     agents_dir=AGENT_DIR,
     # session_service=session_service,
@@ -55,6 +55,7 @@ class ChatRequest(BaseModel):
     message: str
     user_id: str
     user_email: str = None
+    agent_type: Literal["sales", "analysis"] = "sales"  # Default to sales agent
 
 
 class IndexFolderRequest(BaseModel):
@@ -72,10 +73,10 @@ class IndexingResponse(BaseModel):
 
 @app.post("/chat")
 async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
-    """Main chat endpoint for interacting with the sales automation agent"""
+    """Main chat endpoint for interacting with agents"""
     try:
         logger.info(
-            f"Received chat request from user {request.user_id}: {request.message}"
+            f"Received chat request from user {request.user_id} for {request.agent_type} agent: {request.message}"
         )
 
         # Validate request
@@ -85,20 +86,25 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
         if not request.message.strip():
             raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-        # Get or create a session
-        session = await sales_orchestrator._get_or_create_session(request.user_id)
+        # Select the appropriate agent and get/create session
+        if request.agent_type == "sales":
+            session = await sales_orchestrator._get_or_create_session(request.user_id)
+            runner = sales_orchestrator.runner
+        else:  # analysis
+            session = await get_or_create_session(user_id=request.user_id)
+            runner = analysis_runner
 
         # Create content object for the runner
         content = types.Content(
             role="user",
-            parts=[types.Part(text=request.message + f"user_id: {request.user_id}")],
+            parts=[types.Part(text=request.message + f" user_id: {request.user_id}")],
         )
 
         # Run the agent with the session
         events = []
-        async for event in sales_orchestrator.runner.run_async(
+        async for event in runner.run_async(
             user_id=request.user_id,
-            session_id=session.id,  # Use the session ID we just got/created
+            session_id=session.id,
             new_message=content,
         ):
             events.append(event)
@@ -117,7 +123,7 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
         response = AgentResponse(
             success=True,
             message=response_message,
-            data={"session_id": session.id},  # Include session ID in response
+            data={"session_id": session.id, "agent_type": request.agent_type},
             leads_processed=0,
             errors=[],
         )
