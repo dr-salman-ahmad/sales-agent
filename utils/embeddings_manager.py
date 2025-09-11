@@ -11,6 +11,9 @@ import json
 import logging
 
 logger = logging.getLogger(__name__)
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Initialize OpenAI client
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))

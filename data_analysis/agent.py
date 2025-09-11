@@ -205,24 +205,16 @@ When using the search_documents tool:
 4. Only chunks with > -100 percent relevance are included
 5. Use the relevance scores to prioritize information
 
-Example response format:
-"Based on your documents:
+Example Queustion/Response format:
+Question: What is the revenue growth?
+Response: The revenue growth is 25%.
+Question: What is the response of my last two campaigns?
+Response: The response of your last two campaigns is good with a response rate of 80%.
 
-1. From 'Q1 Report.pdf':
-   > "Revenue increased by 25% YoY"
-   This indicates strong growth...
-
-2. From 'Strategy.docx':
-   > "Focus on expanding market share"
-   This aligns with the revenue growth...
-
-Would you like me to analyze any specific aspect of these findings?"
+So response should be short and concise and should not be more than 2-3 sentences. Also it should not a direct answer to the question, it should be a summary of the information found in the documents. It should be in a conversational tone.
 
 If no relevant information is found, respond with something like:
-"I've searched through your documents but couldn't find any information directly relevant to your query. Would you like me to:
-1. Try a different search approach
-2. Look for related topics instead
-3. Help you index more documents"
+"I've searched through your documents but couldn't find any information directly relevant to your query.
 """,
     tools=[search_documents],
 )
