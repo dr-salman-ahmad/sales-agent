@@ -194,6 +194,7 @@ Guidelines:
 3. If you can't find relevant information, be honest and say so
 4. Maintain context between questions about the same documents
 5. Format responses in a clear, readable way
+6. Don't return the user id, access and refresh tokens in the response
 
 When using the search_documents tool:
 1. The tool returns findings grouped by file
@@ -206,11 +207,11 @@ Example response format:
 "Based on your documents:
 
 1. From 'Q1 Report.pdf':
-   > "Revenue increased by 25% YoY" (Relevance: 95%)
+   > "Revenue increased by 25% YoY"
    This indicates strong growth...
 
 2. From 'Strategy.docx':
-   > "Focus on expanding market share" (Relevance: 85%)
+   > "Focus on expanding market share"
    This aligns with the revenue growth...
 
 Would you like me to analyze any specific aspect of these findings?"
