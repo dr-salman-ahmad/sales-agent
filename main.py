@@ -34,17 +34,12 @@ logger = logging.getLogger(__name__)
 
 # Get the directory where main.py is located
 AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
-# Example session service URI (e.g., SQLite)
-# SESSION_SERVICE_URI = "sqlite:///./sessions.db"
-# Example allowed origins for CORS
 ALLOWED_ORIGINS = ["*"]
-# Set web=True if you intend to serve a web interface, False otherwise
 SERVE_WEB_INTERFACE = True
 
 # Call the function to get the FastAPI app instance
 app: FastAPI = get_fast_api_app(
     agents_dir=AGENT_DIR,
-    # session_service=session_service,
     allow_origins=ALLOWED_ORIGINS,
     web=SERVE_WEB_INTERFACE,
 )
@@ -56,12 +51,22 @@ class ChatRequest(BaseModel):
     user_id: str
     user_email: str = None
     agent_type: Literal["sales", "analysis"] = "sales"  # Default to sales agent
+    agent_id: str = None
+
+
+class Agent(BaseModel):
+    id: str
+
+
+class Folder(BaseModel):
+    folderId: str
 
 
 class IndexFolderRequest(BaseModel):
-    user_id: str
-    folder_id: str
-    reset_collection: bool = False  # New parameter to control collection reset
+    agent: Agent
+    folder: Folder
+    userId: str
+    reset_collection: bool = False  # Optional parameter to control collection reset
 
 
 class IndexingResponse(BaseModel):
@@ -86,6 +91,10 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
         if not request.message.strip():
             raise HTTPException(status_code=400, detail="Message cannot be empty")
 
+        text_with_context = request.message + f" user_id: {request.user_id}"
+        if request.agent_id:
+            text_with_context += f" agent_id: {request.agent_id}"
+
         # Select the appropriate agent and get/create session
         if request.agent_type == "sales":
             session = await sales_orchestrator._get_or_create_session(request.user_id)
@@ -97,7 +106,7 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
         # Create content object for the runner
         content = types.Content(
             role="user",
-            parts=[types.Part(text=request.message + f" user_id: {request.user_id}")],
+            parts=[types.Part(text=text_with_context)],
         )
 
         # Run the agent with the session
@@ -156,10 +165,16 @@ async def internal_error_handler(request, exc):
 async def index_folder(request: IndexFolderRequest):
     """Index all files in a Google Drive folder and create embeddings"""
     try:
-        logger.info(f"Indexing folder {request.folder_id} for user {request.user_id}")
+        user_id = request.userId
+        agent_id = request.agent.id
+        folder_id = request.folder.folderId
+
+        logger.info(
+            f"Indexing folder {folder_id} for user {user_id} and agent {agent_id}"
+        )
 
         # Get user's Google Drive OAuth credentials
-        oauth_data = await supabase_client.get_user_oauth_connections(request.user_id)
+        oauth_data = await supabase_client.get_user_oauth_connections(user_id)
         if not oauth_data or "google-drive" not in oauth_data:
             raise HTTPException(
                 status_code=400,
@@ -174,7 +189,7 @@ async def index_folder(request: IndexFolderRequest):
             # Try to refresh the token
             try:
                 updated_creds = await supabase_client.refresh_oauth_token(
-                    request.user_id, "google-drive"
+                    user_id, "google-drive"
                 )
                 if not updated_creds:
                     raise HTTPException(
@@ -190,7 +205,7 @@ async def index_folder(request: IndexFolderRequest):
                 )
 
         # List all files in the folder
-        files = await list_files(drive_creds, request.folder_id)
+        files = await list_files(drive_creds, folder_id)
         if not files:
             return IndexingResponse(
                 success=True, message="No files found in the folder", files_processed=0
@@ -209,9 +224,10 @@ async def index_folder(request: IndexFolderRequest):
                 # Read file content
                 file_data = await read_file_content(drive_creds, file["id"])
 
-                # Process and store embeddings
+                # Process and store embeddings with agent_id and user_id
                 await process_and_store_document(
-                    user_id=request.user_id,
+                    user_id=user_id,
+                    agent_id=agent_id,
                     file_id=file["id"],
                     content=file_data["content"],
                     metadata={
@@ -219,8 +235,9 @@ async def index_folder(request: IndexFolderRequest):
                         "mime_type": file["mimeType"],
                         "modified_time": file["modifiedTime"],
                         "size": file.get("size", 0),
+                        "folder_id": folder_id,
                     },
-                    reset_collection=request.reset_collection,  # Pass the reset flag
+                    reset_collection=request.reset_collection,
                 )
 
                 processed_count += 1

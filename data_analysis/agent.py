@@ -29,21 +29,24 @@ RELEVANCE_THRESHOLD = -100  # Lowered from 50% to 30% to catch more results
 session_service = InMemorySessionService()
 
 
-async def search_documents(user_id: str, query: str) -> Dict[str, Any]:
+async def search_documents(user_id: str, agent_id: str, query: str) -> Dict[str, Any]:
     """
     Search through user's documents using semantic search
 
     Args:
         user_id (str): The user's ID
+        agent_id (str): The agent's ID
         query (str): The search query
 
     Returns:
         dict: Search results with status and findings
     """
     try:
-        # Get the user's document collection
-        collection = get_or_create_collection(user_id)
-        logger.info(f"Searching documents for user {user_id} with query: {query}")
+        # Get the user's document collection for this agent
+        collection = get_or_create_collection(user_id, agent_id)
+        logger.info(
+            f"Searching documents for user {user_id}, agent {agent_id} with query: {query}"
+        )
 
         # Get embedding for the query
         query_embedding = await get_embedding(query)

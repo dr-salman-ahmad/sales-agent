@@ -18,7 +18,7 @@ load_dotenv()
 # Initialize OpenAI client
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Initialize ChromaDB with new client format and embedding function
+# Initialize ChromaDB with new client format
 chroma_client = chromadb.PersistentClient(
     path="embeddings_db",
     settings=Settings(
@@ -29,16 +29,17 @@ chroma_client = chromadb.PersistentClient(
 
 
 def get_or_create_collection(
-    user_id: str, reset: bool = False
+    user_id: str, agent_id: str, reset: bool = False
 ) -> Any:  # Return type Any since Collection type is not available
     """
-    Get or create a ChromaDB collection for a user
+    Get or create a ChromaDB collection for a user and agent pair
 
     Args:
         user_id: The user's ID
+        agent_id: The agent's ID
         reset: If True, delete existing collection and create new one
     """
-    collection_name = f"drive_docs_{user_id}"
+    collection_name = f"docs_{user_id}_{agent_id}"
 
     try:
         if reset:
@@ -52,7 +53,8 @@ def get_or_create_collection(
 
             # Create new collection
             collection = chroma_client.create_collection(
-                name=collection_name, metadata={"user_id": user_id}
+                name=collection_name,
+                metadata={"user_id": user_id, "agent_id": agent_id},
             )
             logger.info(f"Created new collection: {collection_name}")
             return collection
@@ -67,7 +69,8 @@ def get_or_create_collection(
         try:
             # Create new collection
             collection = chroma_client.create_collection(
-                name=collection_name, metadata={"user_id": user_id}
+                name=collection_name,
+                metadata={"user_id": user_id, "agent_id": agent_id},
             )
             logger.info(f"Successfully created collection: {collection_name}")
             return collection
@@ -144,6 +147,7 @@ def delete_file_embeddings(collection: Any, file_id: str) -> bool:
 
 async def process_and_store_document(
     user_id: str,
+    agent_id: str,
     file_id: str,
     content: str,
     metadata: Dict[str, Any],
@@ -154,6 +158,7 @@ async def process_and_store_document(
 
     Args:
         user_id: The user's ID
+        agent_id: The agent's ID
         file_id: The file's ID
         content: The file's content
         metadata: File metadata
@@ -161,8 +166,10 @@ async def process_and_store_document(
     """
     try:
         # Get user's collection (optionally reset it)
-        collection = get_or_create_collection(user_id, reset=reset_collection)
-        logger.info(f"Processing document {metadata.get('name', file_id)}")
+        collection = get_or_create_collection(user_id, agent_id, reset=reset_collection)
+        logger.info(
+            f"Processing document {metadata.get('name', file_id)} for user {user_id}, agent {agent_id}"
+        )
 
         # Delete existing embeddings for this file
         if not reset_collection:  # No need to delete if we reset the whole collection
@@ -187,13 +194,14 @@ async def process_and_store_document(
             chunk_id = f"{file_id}_chunk_{i}"
             ids.append(chunk_id)
 
-            # Add chunk metadata
+            # Add chunk metadata with agent_id
             chunk_metadata = {
                 **metadata,
                 "chunk_index": i,
                 "total_chunks": len(chunks),
                 "file_id": file_id,
                 "user_id": user_id,
+                "agent_id": agent_id,
             }
             metadatas.append(chunk_metadata)
 
@@ -212,11 +220,11 @@ async def process_and_store_document(
         raise
 
 
-def get_stored_embeddings(user_id: str) -> Dict[str, Any]:
-    """Get all stored embeddings for a user"""
+def get_stored_embeddings(user_id: str, agent_id: str) -> Dict[str, Any]:
+    """Get all stored embeddings for a user and agent pair"""
     try:
-        collection = get_or_create_collection(user_id)
-        logger.info(f"Retrieving embeddings for user {user_id}")
+        collection = get_or_create_collection(user_id, agent_id)
+        logger.info(f"Retrieving embeddings for user {user_id}, agent {agent_id}")
 
         # Get all documents
         results = collection.get(include=["embeddings", "documents", "metadatas"])
@@ -232,6 +240,8 @@ def get_stored_embeddings(user_id: str) -> Dict[str, Any]:
                     "mime_type": metadata["mime_type"],
                     "modified_time": metadata["modified_time"],
                     "size": metadata["size"],
+                    "agent_id": metadata["agent_id"],
+                    "folder_id": metadata.get("folder_id", "Unknown"),
                     "chunks": [],
                 }
 
@@ -244,8 +254,21 @@ def get_stored_embeddings(user_id: str) -> Dict[str, Any]:
             )
 
         logger.info(f"Successfully retrieved embeddings for {len(files)} files")
-        return {"total_files": len(files), "files": files}
+        return {
+            "total_files": len(files),
+            "files": files,
+            "user_id": user_id,
+            "agent_id": agent_id,
+        }
 
     except Exception as e:
-        logger.error(f"Error getting embeddings for user {user_id}: {str(e)}")
-        return {"error": str(e), "total_files": 0, "files": {}}
+        logger.error(
+            f"Error getting embeddings for user {user_id}, agent {agent_id}: {str(e)}"
+        )
+        return {
+            "error": str(e),
+            "total_files": 0,
+            "files": {},
+            "user_id": user_id,
+            "agent_id": agent_id,
+        }
