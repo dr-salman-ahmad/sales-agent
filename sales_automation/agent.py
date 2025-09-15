@@ -506,11 +506,11 @@ class SalesAutomationOrchestrator:
                     errors=["No Airtable credentials"],
                 )
 
-            send_emails = task_info.get("send_emails", False)
-            if send_emails and not gmail_creds:
+            create_drafts = task_info.get("create_drafts", False)
+            if create_drafts and not gmail_creds:
                 return AgentResponse(
                     success=False,
-                    message="Gmail connection required for sending emails.",
+                    message="Gmail connection required for creating drafts.",
                     errors=["No Gmail credentials"],
                 )
 
@@ -522,12 +522,12 @@ class SalesAutomationOrchestrator:
                - Use OpenAI to generate a personalized email opener based on company insights
                - Use OpenAI to generate a compelling subject line
                - Update the lead record with personalized content
-               {"- Send the email using Gmail API with access token: " + gmail_creds['access_token'] if send_emails and gmail_creds else ""}
+               {"- Create draft emails using Gmail API with access token: " + gmail_creds['access_token'] if create_drafts and gmail_creds else ""}
             4. Provide a summary of personalization results
             
             User ID: {user_id}
             Sender Email: {gmail_creds.get('provider_email', 'user@example.com') if gmail_creds else 'user@example.com'}
-            Send Emails: {send_emails}
+            Create Drafts: {create_drafts}
             """
 
             response = await self._run_agent_with_prompt(
@@ -537,7 +537,7 @@ class SalesAutomationOrchestrator:
             return AgentResponse(
                 success=True,
                 message=response,
-                data={"task_type": "personalization", "send_emails": send_emails},
+                data={"task_type": "personalization", "create_drafts": create_drafts},
             )
 
         except Exception as e:
