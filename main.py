@@ -50,10 +50,11 @@ class ChatRequest(BaseModel):
     message: str
     user_id: str
     user_email: str = None
-    agent_type: Literal["prospecting", "write_message", "qualifying", "analysis"] = (
-        "prospecting"  # Default to prospecting agent
-    )
+    agent_type: Literal[
+        "prospecting", "write_message", "qualifying", "data_analysis"
+    ] = "prospecting"  # Default to prospecting agent
     agent_id: str = None
+    goal: str = None  # Goal for data_analysis agent
 
 
 class Agent(BaseModel):
@@ -102,7 +103,9 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
             text_with_context += f" agent_type: {request.agent_type}"
             session = await sales_orchestrator._get_or_create_session(request.user_id)
             runner = sales_orchestrator.runner
-        else:  # analysis
+        else:  # data_analysis
+            if request.goal:
+                text_with_context += f" goal: {request.goal}"
             session = await get_or_create_session(user_id=request.user_id)
             runner = analysis_runner
 
