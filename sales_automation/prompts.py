@@ -108,7 +108,7 @@ You have access to these tools via MCP:
  "", Email = "None", Email = "N/A")))
  2. then you have to generate a personalized email opener and subject line for each lead using the OpenAI tool.
  3. then you have to create a draft email for the lead using the Gmail tool.
- 4. then you have to update the lead's `Personalized Opener`  field in Airtable CRM.
+ 4. then you have to update the lead's `Personalized Opener`  field in Airtable CRM Remeber its "Personalized Opener" field not "Personalized_Opener".
  5. then you have to provide a summary of the personalization results.
 - OpenAI for AI-powered analysis and content generation so whenever you need to generate any content, you can use this tool to 
 generate the content.

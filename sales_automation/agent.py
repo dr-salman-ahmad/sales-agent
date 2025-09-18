@@ -64,6 +64,10 @@ def create_root_agent() -> Agent:
             server_params=StdioServerParameters(
                 command="python",
                 args=["-m", "mcp_tools.airtable_crm"],
+                env={
+                    "SUPABASE_URL": os.getenv("SUPABASE_URL", ""),
+                    "SUPABASE_KEY": os.getenv("SUPABASE_KEY", ""),
+                },
             ),
             timeout=60,
         ),
@@ -116,6 +120,8 @@ def create_root_agent() -> Agent:
                 env={
                     "SUPABASE_URL": os.getenv("SUPABASE_URL", ""),
                     "SUPABASE_KEY": os.getenv("SUPABASE_KEY", ""),
+                    "GMAIL_CLIENT_ID": os.getenv("GMAIL_CLIENT_ID", ""),
+                    "GMAIL_CLIENT_SECRET": os.getenv("GMAIL_CLIENT_SECRET", ""),
                 },
             ),
             timeout=60,
