@@ -147,8 +147,8 @@ class PersonalizationRequest(BaseModel):
     personalize_hot_warm: bool = Field(
         False, description="Personalize all hot/warm leads"
     )
-    send_emails: bool = Field(
-        False, description="Whether to send emails after personalization"
+    create_drafts: bool = Field(
+        False, description="Whether to create draft emails after personalization"
     )
 
 

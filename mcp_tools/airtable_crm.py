@@ -11,6 +11,9 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 from utils.helpers import setup_api_logger, log_api_interaction
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Setup API logger
 setup_api_logger()
@@ -27,7 +30,7 @@ async def list_tools() -> list[Tool]:
     return [
         Tool(
             name="get_base_id",
-            description="Get the base ID for user's Sales Agent CRM",
+            description="Get the base ID for user's Agentflow CRM",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -227,13 +230,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> Sequence[TextConten
 
 
 async def get_base_id(arguments: Dict[str, Any]) -> Sequence[TextContent]:
-    """Get the base ID for user's Sales Agent CRM"""
+    """Get the base ID for user's Agentflow CRM"""
     try:
         from supabase import create_client
         import json
-        from dotenv import load_dotenv
-
-        load_dotenv()
 
         # Get Supabase credentials
         supabase_url = os.getenv("SUPABASE_URL")
@@ -293,20 +293,20 @@ async def get_base_id(arguments: Dict[str, Any]) -> Sequence[TextContent]:
                 data = response.json()
                 bases = data.get("bases", [])
 
-                # Find Sales Agent CRM base
+                # Find Agentflow CRM base
                 for base in bases:
-                    if base.get("name") == "Sales Agent CRM":
+                    if base.get("name") == "Agentflow CRM":
                         return [
                             TextContent(
                                 type="text",
-                                text=f"Found Sales Agent CRM base ID: {base['id']}",
+                                text=f"Found Agentflow CRM base ID: {base['id']}",
                             )
                         ]
 
                 return [
                     TextContent(
                         type="text",
-                        text="Error: Sales Agent CRM base not found. Please create a base named 'Sales Agent CRM' in your Airtable workspace.",
+                        text="Error: Agentflow CRM base not found. Please create a base named 'Agentflow CRM' in your Airtable workspace.",
                     )
                 ]
             else:
@@ -351,7 +351,7 @@ async def create_leads(arguments: Dict[str, Any]) -> Sequence[TextContent]:
             fields["UUID"] = generate_uuid()
             processed_leads.append({"fields": fields})
 
-        url = f"https://api.airtable.com/v0/{base_id}/Demo%20Table"
+        url = f"https://api.airtable.com/v0/{base_id}/Contact%20Table"
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
@@ -410,7 +410,7 @@ async def update_lead(arguments: Dict[str, Any]) -> Sequence[TextContent]:
 
         logger.info(f"Updating lead {record_id} in Airtable")
 
-        url = f"https://api.airtable.com/v0/{base_id}/Demo%20Table/{record_id}"
+        url = f"https://api.airtable.com/v0/{base_id}/Contact%20Table/{record_id}"
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
@@ -468,7 +468,7 @@ async def search_leads(arguments: Dict[str, Any]) -> Sequence[TextContent]:
         if filter_formula:
             params["filterByFormula"] = filter_formula
 
-        url = f"https://api.airtable.com/v0/{base_id}/Demo%20Table"
+        url = f"https://api.airtable.com/v0/{base_id}/Contact%20Table"
         headers = {"Authorization": f"Bearer {access_token}"}
 
         # Log the request

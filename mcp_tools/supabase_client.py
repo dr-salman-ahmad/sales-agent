@@ -67,8 +67,6 @@ async def get_oauth_connection(arguments: Dict[str, Any]) -> Sequence[TextConten
         supabase_key = os.getenv("SUPABASE_KEY")
         gmail_client_id = os.getenv("GMAIL_CLIENT_ID")
         gmail_client_secret = os.getenv("GMAIL_CLIENT_SECRET")
-        airtable_client_id = os.getenv("AIRTABLE_CLIENT_ID")
-        airtable_client_secret = os.getenv("AIRTABLE_CLIENT_SECRET")
 
         if not supabase_url or not supabase_key:
             return [
@@ -162,11 +160,7 @@ async def get_oauth_connection(arguments: Dict[str, Any]) -> Sequence[TextConten
                                 )
                                 raise
 
-                elif (
-                    provider == "airtable"
-                    and airtable_client_id
-                    and airtable_client_secret
-                ):
+                elif provider == "airtable":
                     # Refresh Airtable token
                     async with httpx.AsyncClient() as http_client:
                         refresh_response = await http_client.post(
@@ -208,6 +202,12 @@ async def get_oauth_connection(arguments: Dict[str, Any]) -> Sequence[TextConten
                                     f"Failed to update {provider} tokens in database: {e}"
                                 )
                                 raise
+
+                        if refresh_response.status_code == 401:
+                            logger.error(
+                                f"Failed to refresh {provider} token: Invalid refresh token"
+                            )
+                            raise
 
             except Exception as refresh_error:
                 logger.error(f"Error refreshing {provider} token: {refresh_error}")

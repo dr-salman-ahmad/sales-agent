@@ -170,7 +170,7 @@ POST /qualify
 POST /personalize
 {
     "user_id": "user-123",
-    "parameters": {"send_emails": true}
+    "parameters": {"create_drafts": true}
 }
 ```
 
@@ -276,7 +276,7 @@ curl -X POST http://localhost:8080/personalize \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "user-123",
-    "parameters": {"send_emails": true}
+    "parameters": {"create_drafts": true}
   }'
 ```
 
@@ -312,9 +312,9 @@ CREATE TABLE profiles (
 
 ### Airtable CRM Structure
 
-Each user needs a "Sales Agent CRM" base with:
+Each user needs a "Agentflow CRM" base with:
 
-**Demo Table (Leads):**
+**Contact Table (Leads):**
 - UUID (Single line text)
 - Name (Single line text)
 - Website (URL)
