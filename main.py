@@ -223,12 +223,23 @@ async def index_folder(request: IndexFolderRequest):
         # Process each file
         for file in files:
             try:
-                # Skip unsupported file types
+                # Skip folders (they should already be filtered out, but just in case)
                 if "folder" in file["mimeType"]:
+                    logger.info(f"Skipping folder: {file['name']}")
                     continue
+
+                logger.info(
+                    f"Processing file: {file['name']} (Type: {file['mimeType']}) from folder: {file.get('folder_path', 'unknown')}"
+                )
 
                 # Read file content
                 file_data = await read_file_content(drive_creds, file["id"])
+
+                # Check if content was successfully extracted
+                if not file_data.get("content", "").strip():
+                    logger.warning(f"No content extracted from file: {file['name']}")
+                    errors.append(f"No content extracted from file: {file['name']}")
+                    continue
 
                 # Process and store embeddings with agent_id and user_id
                 await process_and_store_document(
@@ -241,13 +252,18 @@ async def index_folder(request: IndexFolderRequest):
                         "mime_type": file["mimeType"],
                         "modified_time": file["modifiedTime"],
                         "size": file.get("size", 0),
-                        "folder_id": folder_id,
+                        "folder_id": file.get(
+                            "folder_path", folder_id
+                        ),  # Use actual folder path
+                        "original_folder_id": folder_id,  # Keep track of the root folder
                     },
                     reset_collection=request.reset_collection,
                 )
 
                 processed_count += 1
-                logger.info(f"Successfully processed file: {file['name']}")
+                logger.info(
+                    f"Successfully processed file: {file['name']} (Content length: {len(file_data['content'])})"
+                )
 
             except Exception as e:
                 error_msg = (
