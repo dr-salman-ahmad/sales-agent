@@ -18,14 +18,25 @@ load_dotenv()
 # Initialize OpenAI client
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Initialize ChromaDB with new client format
+# Get storage configuration from environment variables
+EMBEDDINGS_BUCKET = None
+STORAGE_PATH = "embeddings_db"  # Default to local storage
+
+if os.getenv("ENV") == "production":
+    # In production, use Google Cloud Storage for embeddings
+    EMBEDDINGS_BUCKET = os.getenv("EMBEDDINGS_BUCKET", "orchestrator-agent-embeddings")
+    STORAGE_PATH = f"gs://{EMBEDDINGS_BUCKET}/embeddings_db"
+
+# Initialize ChromaDB with Google Cloud Storage backend
 chroma_client = chromadb.PersistentClient(
-    path="embeddings_db",
+    path=STORAGE_PATH,
     settings=Settings(
         anonymized_telemetry=False,
         allow_reset=True,
     ),
 )
+
+logger.info(f"ChromaDB initialized with storage path: {STORAGE_PATH}")
 
 
 def get_or_create_collection(

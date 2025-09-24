@@ -14,8 +14,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Create embeddings directory with proper permissions
-RUN mkdir -p /app/embeddings_db && \
-    chmod 777 /app/embeddings_db
+# RUN mkdir -p /app/embeddings_db && \
+#     chmod 777 /app/embeddings_db
 
 # Create non-root user
 RUN adduser --disabled-password --gecos "" myuser && \
