@@ -21,6 +21,7 @@ from utils.data_models import AgentResponse, TaskRequest
 from utils.supabase_client import supabase_client
 from utils.drive_manager import list_files, read_file_content
 from utils.embeddings_manager import process_and_store_document
+from utils.gcs_sync_manager import get_sync_manager, backup_embeddings_folder
 
 # Load environment variables
 load_dotenv()
@@ -291,6 +292,111 @@ async def index_folder(request: IndexFolderRequest):
     except Exception as e:
         logger.error(f"Error indexing folder: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error indexing folder: {str(e)}")
+
+
+# GCS Sync Management Endpoints
+@app.get("/gcs/backup-info")
+async def get_backup_info():
+    """Get information about available backups in GCS"""
+    try:
+        sync_manager = get_sync_manager()
+        if not sync_manager:
+            raise HTTPException(
+                status_code=500, detail="Failed to initialize sync manager"
+            )
+
+        backup_info = sync_manager.get_backup_info()
+
+        return {"success": True, "backup_info": backup_info}
+
+    except Exception as e:
+        logger.error(f"Error getting backup info: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error getting backup info: {str(e)}"
+        )
+
+
+@app.post("/gcs/backup")
+async def create_backup():
+    """Manually create a backup of the embeddings folder"""
+    try:
+        sync_manager = get_sync_manager()
+        if not sync_manager:
+            raise HTTPException(
+                status_code=500, detail="Failed to initialize sync manager"
+            )
+
+        # Check if local folder exists
+        if not os.path.exists("embeddings_db"):
+            raise HTTPException(
+                status_code=404, detail="Local embeddings folder does not exist"
+            )
+
+        # Create backup
+        if sync_manager.upload_folder("embeddings_db"):
+            return {
+                "success": True,
+                "message": "Backup created successfully",
+                "bucket_name": sync_manager.bucket_name,
+                "folder_path": f"gs://{sync_manager.bucket_name}/{sync_manager.gcs_folder}",
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create backup")
+
+    except Exception as e:
+        logger.error(f"Error creating backup: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error creating backup: {str(e)}")
+
+
+@app.post("/gcs/restore")
+async def restore_from_backup():
+    """Restore embeddings folder from GCS backup"""
+    try:
+        sync_manager = get_sync_manager()
+        if not sync_manager:
+            raise HTTPException(
+                status_code=500, detail="Failed to initialize sync manager"
+            )
+
+        # Download and restore
+        if sync_manager.download_folder("embeddings_db"):
+            return {
+                "success": True,
+                "message": "Restored from backup successfully",
+                "bucket_name": sync_manager.bucket_name,
+                "folder_path": f"gs://{sync_manager.bucket_name}/{sync_manager.gcs_folder}",
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to restore from backup")
+
+    except Exception as e:
+        logger.error(f"Error restoring from backup: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error restoring from backup: {str(e)}"
+        )
+
+
+@app.post("/gcs/cleanup")
+async def cleanup_old_backups():
+    """Clean up old backups, keeping only the most recent ones"""
+    try:
+        sync_manager = get_sync_manager()
+        if not sync_manager:
+            raise HTTPException(
+                status_code=500, detail="Failed to initialize sync manager"
+            )
+
+        # Clean up old backups
+        if sync_manager.cleanup_old_backups(keep_count=5):
+            return {"success": True, "message": "Old backups cleaned up successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to cleanup old backups")
+
+    except Exception as e:
+        logger.error(f"Error cleaning up backups: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error cleaning up backups: {str(e)}"
+        )
 
 
 if __name__ == "__main__":
