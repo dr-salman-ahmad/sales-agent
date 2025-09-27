@@ -44,6 +44,24 @@ async def list_tools() -> list[Tool]:
                 "required": ["user_id", "provider"],
             },
         ),
+        Tool(
+            name="get_personas",
+            description="Get user's ICP personas from Supabase qualification_personas table",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_id": {
+                        "type": "string",
+                        "description": "User ID to get personas for",
+                    },
+                    "agent_id": {
+                        "type": "string",
+                        "description": "Agent ID to filter personas (optional)",
+                    },
+                },
+                "required": ["user_id"],
+            },
+        ),
     ]
 
 
@@ -52,6 +70,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> Sequence[TextConten
     """Handle tool calls."""
     if name == "get_oauth_connection":
         return await get_oauth_connection(arguments)
+    elif name == "get_personas":
+        return await get_personas(arguments)
 
     raise ValueError(f"Unknown tool: {name}")
 
@@ -302,6 +322,70 @@ async def update_oauth_tokens(
     except Exception as e:
         logger.error(f"Error updating OAuth tokens: {str(e)}")
         raise
+
+
+async def get_personas(arguments: Dict[str, Any]) -> Sequence[TextContent]:
+    """Get user's ICP personas from Supabase qualification_personas table"""
+    try:
+        from supabase import create_client
+
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_KEY")
+
+        if not supabase_url or not supabase_key:
+            return [
+                TextContent(
+                    type="text", text="Error: Supabase credentials not configured"
+                )
+            ]
+
+        user_id = arguments.get("user_id")
+        agent_id = arguments.get("agent_id")
+
+        if not user_id:
+            return [TextContent(type="text", text="Error: User ID is required")]
+
+        logger.info(f"Getting personas for user {user_id}")
+
+        client = create_client(supabase_url, supabase_key)
+
+        # Build query
+        query = (
+            client.table("qualification_personas").select("*").eq("user_id", user_id)
+        )
+
+        # Add agent_id filter if provided
+        if agent_id:
+            query = query.eq("agent_id", agent_id)
+
+        # Execute query
+        response = query.execute()
+
+        if response.data:
+            persona = response.data[0]  # Get the first persona
+
+            result_text = f"User's ICP Persona:\n\n"
+            result_text += f"Persona Name: {persona.get('persona_name', 'N/A')}\n"
+            result_text += f"One Liner: {persona.get('one_liner', 'N/A')}\n"
+            result_text += f"Description: {persona.get('description', 'N/A')}\n"
+            result_text += f"Keywords: {persona.get('keywords', 'N/A')}\n"
+            result_text += f"Job Titles: {persona.get('job_titles', 'N/A')}\n"
+            result_text += f"Region: {persona.get('region', 'N/A')}\n"
+            result_text += f"Revenue/Funding Stage: {persona.get('revenue_funding_stage', 'N/A')}\n"
+
+            return [TextContent(type="text", text=result_text)]
+        else:
+            return [
+                TextContent(
+                    type="text",
+                    text=f"No persona found for user {user_id}. Please create an ICP persona in your Supabase qualification_personas table.",
+                )
+            ]
+
+    except Exception as e:
+        error_msg = f"Error getting personas: {str(e)}"
+        logger.error(error_msg)
+        return [TextContent(type="text", text=f"Error: {error_msg}")]
 
 
 async def main():

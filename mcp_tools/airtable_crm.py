@@ -190,25 +190,6 @@ async def list_tools() -> list[Tool]:
                 "required": ["access_token", "base_id"],
             },
         ),
-        Tool(
-            name="get_personas",
-            description="Get user's ICP personas from Airtable",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "access_token": {
-                        "type": "string",
-                        "description": "User's Airtable access token",
-                    },
-                    "base_id": {"type": "string", "description": "Airtable base ID"},
-                    "user_id": {
-                        "type": "string",
-                        "description": "User ID to filter personas",
-                    },
-                },
-                "required": ["access_token", "base_id", "user_id"],
-            },
-        ),
     ]
 
 
@@ -223,8 +204,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> Sequence[TextConten
         return await update_lead(arguments)
     elif name == "search_leads":
         return await search_leads(arguments)
-    elif name == "get_personas":
-        return await get_personas(arguments)
 
     raise ValueError(f"Unknown tool: {name}")
 
@@ -518,83 +497,6 @@ async def search_leads(arguments: Dict[str, Any]) -> Sequence[TextContent]:
 
     except Exception as e:
         error_msg = f"Error searching leads: {str(e)}"
-        logger.error(error_msg)
-        return [TextContent(type="text", text=f"Error: {error_msg}")]
-
-
-async def get_personas(arguments: Dict[str, Any]) -> Sequence[TextContent]:
-    """Get user's ICP personas from Airtable"""
-    try:
-        access_token = arguments.get("access_token")
-        base_id = arguments.get("base_id")
-        user_id = arguments.get("user_id")
-
-        if not access_token or not base_id or not user_id:
-            return [
-                TextContent(
-                    type="text",
-                    text="Error: Access token, base ID, and user ID are required",
-                )
-            ]
-
-        logger.info(f"Getting personas for user {user_id}")
-
-        url = f"https://api.airtable.com/v0/{base_id}/Personas"
-        headers = {"Authorization": f"Bearer {access_token}"}
-        params = {
-            "filterByFormula": f'{{User ID}} = "{user_id}"',
-            "maxRecords": 1,
-        }
-
-        # Log the request
-        log_api_interaction(
-            method="GET", url=url, headers=headers, body={"params": params}
-        )
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url, headers=headers, params=params)
-
-            # Log the response
-            log_api_interaction(
-                method="GET", url=url, headers=headers, response=response
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                records = data.get("records", [])
-
-                if records:
-                    persona = records[0].get("fields", {})
-
-                    result_text = f"User's ICP Persona:\n\n"
-                    result_text += (
-                        f"Persona Name: {persona.get('Persona Name', 'N/A')}\n"
-                    )
-                    result_text += f"Keywords: {persona.get('Keywords', 'N/A')}\n"
-                    result_text += f"Description: {persona.get('Description (size, pain points, goals)', 'N/A')}\n"
-                    result_text += (
-                        f"Revenue/Funding: {persona.get('Revenue/Funding$', 'N/A')}\n"
-                    )
-                    result_text += f"Region: {persona.get('Region', 'N/A')}\n"
-                    result_text += f"Job Titles: {persona.get('Job Titles', 'N/A')}\n"
-
-                    return [TextContent(type="text", text=result_text)]
-                else:
-                    return [
-                        TextContent(
-                            type="text",
-                            text=f"No persona found for user {user_id}. Please create an ICP persona in your Airtable CRM.",
-                        )
-                    ]
-            else:
-                error_msg = (
-                    f"Failed to get personas: {response.status_code} - {response.text}"
-                )
-                logger.error(error_msg)
-                return [TextContent(type="text", text=f"Error: {error_msg}")]
-
-    except Exception as e:
-        error_msg = f"Error getting personas: {str(e)}"
         logger.error(error_msg)
         return [TextContent(type="text", text=f"Error: {error_msg}")]
 
