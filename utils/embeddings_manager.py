@@ -18,14 +18,41 @@ load_dotenv()
 # Initialize OpenAI client
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Initialize ChromaDB with new client format
+# Get storage configuration from environment variables
+EMBEDDINGS_BUCKET = None
+STORAGE_PATH = "embeddings_db"  # Default to local storage
+
+# Always use local storage with GCS sync (both local and production)
+EMBEDDINGS_BUCKET = os.getenv("EMBEDDINGS_BUCKET", "orchestrator-agent-embeddings")
+
+# Import and ensure embeddings folder exists locally
+try:
+    from .gcs_sync_manager import ensure_embeddings_folder_exists
+
+    # Start the daily backup scheduler
+    from .scheduled_backup import start_scheduler
+
+    start_scheduler()
+
+    logger.info("Ensuring embeddings folder exists locally...")
+
+    if ensure_embeddings_folder_exists():
+        logger.info("Successfully ensured embeddings folder exists locally")
+    else:
+        logger.warning("Failed to ensure embeddings folder exists locally")
+except Exception as e:
+    logger.error(f"Error ensuring embeddings folder exists: {str(e)}")
+
+# Initialize ChromaDB with local storage
 chroma_client = chromadb.PersistentClient(
-    path="embeddings_db",
+    path=STORAGE_PATH,
     settings=Settings(
         anonymized_telemetry=False,
         allow_reset=True,
     ),
 )
+
+logger.info(f"ChromaDB initialized with storage path: {STORAGE_PATH}")
 
 
 def get_or_create_collection(

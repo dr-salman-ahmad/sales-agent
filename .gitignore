@@ -6,4 +6,5 @@ tests/
 google-cred.json
 logs/
 embeddings_db/
+.DS_Store
 my-env/
