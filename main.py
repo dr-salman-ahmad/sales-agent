@@ -399,6 +399,28 @@ async def cleanup_old_backups():
         )
 
 
+class SetupCRMRequest(BaseModel):
+    user_id: str
+    workspace_id: Optional[str] = None
+
+
+@app.post("/setup-crm")
+async def setup_crm(request: SetupCRMRequest):
+    """Setup Agentflow CRM base and Contact table for a user"""
+    try:
+        from utils.crm_setup import setup_agentflow_crm
+
+        result = await setup_agentflow_crm(request.user_id, request.workspace_id)
+        return JSONResponse(content=result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"Error setting up CRM: {str(e)}"
+        logger.error(error_msg)
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
 if __name__ == "__main__":
     # Get configuration from environment
     host = os.getenv("HOST", "0.0.0.0")
