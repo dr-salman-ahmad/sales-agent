@@ -37,8 +37,8 @@ async def list_tools() -> list[Tool]:
                     },
                     "provider": {
                         "type": "string",
-                        "description": "OAuth provider (gmail, airtable)",
-                        "enum": ["gmail", "airtable"],
+                        "description": "OAuth provider (gmail)",
+                        "enum": ["gmail"],
                     },
                 },
                 "required": ["user_id", "provider"],
@@ -180,55 +180,6 @@ async def get_oauth_connection(arguments: Dict[str, Any]) -> Sequence[TextConten
                                 )
                                 raise
 
-                elif provider == "airtable":
-                    # Refresh Airtable token
-                    async with httpx.AsyncClient() as http_client:
-                        refresh_response = await http_client.post(
-                            "https://airtable.com/oauth2/v1/token",
-                            headers={
-                                "Content-Type": "application/x-www-form-urlencoded",
-                                "Authorization": "Basic Mzk3ZTYxZTMtZTUyZC00MDY3LTk5ODUtODgwZjE5MWUzNTIzOmY5MmQ2NjdlZGJlMDFjZmJkMmM3OTFiMDUyYmZmMDE2NDgxODg2YmNmZjQwYmJmNTQ5ZWE2ODEwNmQ3ZDJhYjU=",
-                            },
-                            data={
-                                "grant_type": "refresh_token",
-                                "refresh_token": row["refresh_token"],
-                            },
-                        )
-
-                        if refresh_response.status_code == 200:
-                            token_data = refresh_response.json()
-                            # Update tokens in database
-                            try:
-                                updated_data = await update_oauth_tokens(
-                                    user_id=user_id,
-                                    provider=provider,
-                                    access_token=token_data["access_token"],
-                                    refresh_token=token_data.get(
-                                        "refresh_token", row["refresh_token"]
-                                    ),
-                                    expires_in=token_data.get("expires_in", 3600),
-                                )
-                                row["access_token"] = updated_data["access_token"]
-                                if "refresh_token" in updated_data:
-                                    row["refresh_token"] = updated_data["refresh_token"]
-                                token_expires_at = datetime.fromisoformat(
-                                    updated_data["token_expires_at"].replace(
-                                        "Z", "+00:00"
-                                    )
-                                )
-                                is_expired = False
-                            except Exception as e:
-                                logger.error(
-                                    f"Failed to update {provider} tokens in database: {e}"
-                                )
-                                raise
-
-                        if refresh_response.status_code == 401:
-                            logger.error(
-                                f"Failed to refresh {provider} token: Invalid refresh token"
-                            )
-                            raise
-
             except Exception as refresh_error:
                 logger.error(f"Error refreshing {provider} token: {refresh_error}")
 
@@ -265,7 +216,7 @@ async def update_oauth_tokens(
 
     Args:
         user_id (str): The user ID
-        provider (str): OAuth provider (gmail, airtable)
+        provider (str): OAuth provider (gmail)
         access_token (str): New access token
         refresh_token (str, optional): New refresh token. Defaults to None.
         expires_in (int, optional): Token expiration time in seconds. Defaults to 3600.
@@ -295,9 +246,6 @@ async def update_oauth_tokens(
             "token_expires_at": expires_at.isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
-
-        if provider == "airtable" and refresh_token:
-            update_data["refresh_token"] = refresh_token
 
         # Execute request
         response = (

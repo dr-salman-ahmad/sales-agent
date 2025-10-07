@@ -7,7 +7,6 @@ import logging
 from typing import Dict, Any, Optional, List, Literal
 import uvicorn
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -17,11 +16,11 @@ from google.genai import types
 # Import our components
 from sales_automation.agent import sales_orchestrator
 from data_analysis.agent import runner as analysis_runner, get_or_create_session
-from utils.data_models import AgentResponse, TaskRequest
+from utils.data_models import AgentResponse
 from utils.supabase_client import supabase_client
 from utils.drive_manager import list_files, read_file_content
 from utils.embeddings_manager import process_and_store_document
-from utils.gcs_sync_manager import get_sync_manager, backup_embeddings_folder
+from utils.gcs_sync_manager import get_sync_manager
 
 # Load environment variables
 load_dotenv()

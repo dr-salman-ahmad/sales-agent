@@ -15,10 +15,6 @@ from mcp import StdioServerParameters
 from google.adk.sessions import InMemorySessionService
 from google.adk.runners import Runner
 from .prompts import get_root_agent_instructions
-from utils.auth import oauth_manager
-from utils.supabase_client import supabase_client
-from utils.data_models import TaskRequest, AgentResponse
-from utils.helpers import extract_json_from_text
 
 logger = logging.getLogger(__name__)
 
@@ -58,12 +54,12 @@ def create_root_agent() -> Agent:
     )
     mcp_tools.append(hunter_tool)
 
-    # Airtable CRM MCP Tool
-    airtable_tool = MCPToolset(
+    # Supabase CRM MCP Tool
+    supabase_crm_tool = MCPToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
                 command="python",
-                args=["-m", "mcp_tools.airtable_crm"],
+                args=["-m", "mcp_tools.supabase_crm"],
                 env={
                     "SUPABASE_URL": os.getenv("SUPABASE_URL", ""),
                     "SUPABASE_KEY": os.getenv("SUPABASE_KEY", ""),
@@ -72,7 +68,7 @@ def create_root_agent() -> Agent:
             timeout=60,
         ),
     )
-    mcp_tools.append(airtable_tool)
+    mcp_tools.append(supabase_crm_tool)
 
     # Gmail MCP Tool
     gmail_tool = MCPToolset(

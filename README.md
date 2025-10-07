@@ -8,9 +8,9 @@ An AI-powered sales automation agent built with Google ADK and MCP integration t
 - **Lead Enrichment**: Gather emails, company insights, and background data
 - **Lead Qualification**: Score leads against your ICP (Ideal Customer Persona)
 - **Email Personalization**: Generate personalized email content and send via Gmail
-- **User-Specific CRM**: Each user works with their own Airtable workspace
+- **User-Specific CRM**: Each user works with their own Supabase CRM workspace
 - **Multi-User Support**: Handle multiple users with separate credentials
-- **OAuth Integration**: Secure Gmail and Airtable authentication
+- **OAuth Integration**: Secure Gmail authentication
 - **Real-time Processing**: Fast, parallel processing of leads
 
 ## 🏗️ Architecture
@@ -23,7 +23,7 @@ An AI-powered sales automation agent built with Google ADK and MCP integration t
          │                       │                       │
          │                       │                       ├─ Azure Logic App
          │                       │                       ├─ Hunter.io
-         │                       │                       ├─ Airtable CRM
+         │                       │                       ├─ Supabase CRM
          │                       │                       ├─ Gmail Sender
          │                       │                       ├─ Web Scraper
          │                       │                       └─ OpenAI Client
@@ -61,7 +61,7 @@ git clone <repository-url>
 cd sales-automation-agent
 
 # Copy environment template
-cp env.example .env
+cp .env.example .env
 ```
 
 ### 2. Configure Environment Variables
@@ -83,8 +83,6 @@ OPENAI_API_KEY=your-openai-api-key
 # OAuth Credentials
 GMAIL_CLIENT_ID=your-gmail-client-id
 GMAIL_CLIENT_SECRET=your-gmail-client-secret
-AIRTABLE_CLIENT_ID=your-airtable-client-id
-AIRTABLE_CLIENT_SECRET=your-airtable-client-secret
 
 # Database
 SUPABASE_URL=your-supabase-url
@@ -308,35 +306,89 @@ CREATE TABLE profiles (
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
+
+-- User CRM (Leads)
+CREATE TABLE user_crm (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    agent_id UUID REFERENCES public.agents(id) ON DELETE SET NULL,
+    
+    -- Core company/contact information
+    company TEXT,
+    name TEXT,
+    uuid TEXT,
+    title TEXT,
+    address TEXT,
+    website TEXT,
+    rating TEXT,
+    opening_hours TEXT,
+    phone TEXT,
+    email TEXT,
+    
+    -- Enrichment & analysis
+    background TEXT,
+    enriched BOOLEAN DEFAULT false,
+    score TEXT,
+    
+    -- Company details
+    industry TEXT,
+    employees TEXT,
+    linkedin TEXT,
+    funding_round TEXT,
+    new_hires TEXT,
+    product_launch TEXT,
+    
+    -- Outreach
+    personalized_opener TEXT,
+    campaign TEXT,
+    
+    -- System metadata
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL
+);
+
+-- Qualification personas (ICP)
+CREATE TABLE qualification_personas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    agent_id UUID REFERENCES public.agents(id) ON DELETE SET NULL,
+    persona_name TEXT,
+    one_liner TEXT,
+    description TEXT,
+    keywords TEXT,
+    job_titles TEXT,
+    region TEXT,
+    revenue_funding_stage TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL
+);
 ```
 
-### Airtable CRM Structure
+### Supabase Setup Guide
 
-Each user needs a "Agentflow CRM" base with:
+1. **Create a Supabase Project**
+   - Go to [supabase.com](https://supabase.com) and create a new project
+   - Note your project URL and API key
 
-**Contact Table (Leads):**
-- UUID (Single line text)
-- Name (Single line text)
-- Website (URL)
-- Email (Email)
-- Phone (Phone number)
-- Industry (Single line text)
-- Company Size (Single line text)
-- Address (Long text)
-- LinkedIn (URL)
-- Background (Long text)
-- Score (Single select: Hot, Warm, Cold)
-- Personalized Opener (Long text)
-- Enriched (Checkbox)
+2. **Set up Database Tables**
+   - Run the SQL schema above in your Supabase SQL editor
+   - Enable Row Level Security (RLS) for data isolation
 
-**Personas Table (ICP):**
-- User ID (Single line text)
-- Name (Single line text)
-- Target Industries (Multiple select)
-- Company Size Range (Single line text)
-- Job Titles (Multiple select)
-- Pain Points (Multiple select)
-- Use Cases (Multiple select)
+3. **Configure Authentication**
+   - Set up OAuth providers in Supabase Auth settings
+   - Add Gmail OAuth credentials
+
+4. **Environment Variables**
+   - Add your Supabase URL and API key to `.env`
+   - Configure Gmail OAuth credentials
+
+5. **Test Connection**
+   ```bash
+   python -c "
+   from utils.supabase_client import supabase_client
+   print('Supabase connected successfully')
+   "
+   ```
 
 ## 🧪 Testing
 
@@ -410,9 +462,9 @@ All endpoints return a consistent response format:
 
 ## 🔒 Security
 
-- OAuth 2.0 for Gmail and Airtable authentication
+- OAuth 2.0 for Gmail authentication
 - Automatic token refresh
-- User data isolation
+- User data isolation with Supabase RLS
 - Non-root Docker container
 - Environment variable protection
 - Input validation and sanitization

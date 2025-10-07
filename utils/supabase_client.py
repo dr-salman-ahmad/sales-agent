@@ -11,7 +11,6 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 
 load_dotenv()
-from .data_models import OAuthConnection, User
 
 logger = logging.getLogger(__name__)
 
